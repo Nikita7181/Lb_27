@@ -47,10 +47,10 @@ std::vector<T> merge (std::vector<T> * splitted)
 {
     std::vector<T> arr;
     int first_non_empty = 0;
-    T min_val;// = splitted[first_non_empty][0];
-    T new_min_val;// = splitted[first_non_empty][0];
-    int min_index;// = first_non_empty;
-    int new_min_index;// = first_non_empty;
+    T min_val;
+    T new_min_val;
+    int min_index;
+    int new_min_index;
 
     bool empty = false;
 
