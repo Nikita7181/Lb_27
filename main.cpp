@@ -1,212 +1,206 @@
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <iostream>
-#include <queue>
 #include <vector>
-#include <set>
 #include <algorithm>
+#include <cmath>
+#include <thread>
+#include <time.h>
+#include <iomanip>
 
-using namespace std;
+#define ARR_SIZE 20
 
 template <typename T>
-void print(vector<T> &arr)
+void print (std::vector<T> arr)
 {
-    for (auto i = arr.begin(); i< arr.end(); i++)
-        cout << *i << " ";
-    cout << endl;
+    for (int i = 0; i < arr.size(); i++)
+        std::cout << arr[i] << " ";
+    std::cout << std::endl;
+}
+
+template <typename T>
+void fill (std::vector<T> & arr)
+{
+    for (int i = 0; i < ARR_SIZE; i++)
+        arr.push_back (rand() % (ARR_SIZE * 10));
 }
 
 
-queue< pair<int, int> > tasks;
 
-mutex q_mutex, s_mutex;
-
-condition_variable cv;
-
-set<int> ss;
-
-
-template <typename T>
-int partition(vector<T> &arr, bool dest, int l, int r)
+template <typename T, int thread_count>
+std::vector<T> * split (std::vector<T> arr)
 {
-    T tmp = arr[r];
-    int i = l - 1;
+    std::vector<T> * splitted = new std::vector<T>[thread_count];
+    int split_size = arr.size() / thread_count;
+    int delta = arr.size() % thread_count;
 
-    for (int j = l; j <= r - 1; j++)
+    int i = 0;
+    for (i = 0; i < thread_count - 1; i++)
+    {
+        splitted[i] = std::vector<T>(arr.begin() + split_size * i, arr.begin() +  split_size * i + split_size );
+    }
+    splitted[i] = std::vector<T>(arr.begin() + split_size * i, arr.begin()  + split_size * i + split_size + delta);
+
+    return splitted;
+}
+
+template <typename T, int thread_count, bool dest>
+std::vector<T> merge (std::vector<T> * splitted)
+{
+    std::vector<T> arr;
+    int first_non_empty = 0;
+    T min_val;// = splitted[first_non_empty][0];
+    T new_min_val;// = splitted[first_non_empty][0];
+    int min_index;// = first_non_empty;
+    int new_min_index;// = first_non_empty;
+
+    bool empty = false;
+
+    while (!empty)
+    {
+        min_val = splitted[first_non_empty][0];
+        new_min_val = splitted[first_non_empty][0];
+        min_index = first_non_empty;
+        new_min_index = first_non_empty;
+
+        for (int i = 0; i < thread_count; i++)
+        {
+            if (splitted[i].size() > 0)
+            {
+                if (dest)
+                {
+
+                    if (splitted[i][0] < min_val)
+                    {
+                        new_min_val = splitted[i][0];
+                        new_min_index = i;
+                    }
+                    if ( new_min_val < min_val)
+                    {
+                        min_val = new_min_val;
+                        min_index = new_min_index;
+                    }
+                }
+                else
+                {
+                    if (splitted[i][0] > min_val)
+                    {
+                        new_min_val = splitted[i][0];
+                        new_min_index = i;
+                    }
+                    if ( new_min_val > min_val)
+                    {
+                        min_val = new_min_val;
+                        min_index = new_min_index;
+                    }
+                }
+            }
+
+
+        }
+
+        arr.push_back(splitted[min_index].front());
+        splitted[min_index].erase(splitted[min_index].begin());
+
+
+        for (int i = 0; i < thread_count; i++)
+        {
+            if (splitted[i].size() > 0)
+            {
+                empty = false;
+                first_non_empty = i;
+                break;
+            }
+            empty = true;
+        }
+    }
+
+    return arr;
+}
+
+template <typename T, bool dest>
+int Partition (std::vector <int> &vec, int start, int end) //принимает часть массива и относительно опорной функции переноси меньгие влево а большие вправо
+{
+    int value = vec[end];
+    int position = start;
+
+    for(int i = start; i < end; i++)
+    {
         if (dest)
         {
-            if (arr[j] < tmp)
+            if (vec[i] <= value)
             {
-                i++;
-                swap(arr[i], arr[j]);
+                int temp = vec[i];
+                vec[i] = vec[position];
+                vec[position] = temp;
+                position++;
             }
         }
         else
         {
-            if (arr[j] > tmp)
+            if (vec[i] >= value)
             {
-                i++;
-                swap(arr[i], arr[j]);
+                int temp = vec[i];
+                vec[i] = vec[position];
+                vec[position] = temp;
+                position++;
             }
         }
-
-    swap(arr[i + 1], arr[r]);
-    i++;
-    return i;
-}
-
-
-template <typename T>
-void quick_sort(vector<T> & arr, bool dest)
-{
-    while (true)
-    {
-        unique_lock<mutex> u_lock(q_mutex);
-
-
-        if ( ss.size() == arr.size() )
-            return;
-
-
-        if ( tasks.size() > 0 )
-        {
-
-            pair<int, int> cur_task = tasks.front();
-            tasks.pop();
-
-            int l = cur_task.first, r = cur_task.second;
-
-
-            if (l < r)
-            {
-                int q = partition(arr, dest, l, r);
-
-
-                s_mutex.lock();
-                ss.insert(q);
-                ss.insert(l);
-                ss.insert(r);
-                s_mutex.unlock();
-
-
-                tasks.push( make_pair(l, q - 1) );
-                tasks.push( make_pair(q + 1, r) );
-
-
-                cv.notify_one();
-            }
-
-        }
-        else
-
-            cv.wait(u_lock);
     }
+    vec[end] = vec[position];
+    vec[position] = value;
+    return position;
 }
 
-
-
-
-template <typename T, int threads_count, bool dest>
-void sort(vector<T> & arr)
+template <typename T, bool dest>
+void quicksort(std::vector<T> &vec, int start, int end)
 {
+    if(start > end)
+    {
+        return;
+    }
+    int pivot = Partition<T, dest>(vec, start, end);
+    quicksort<T,dest >(vec, start, pivot-1);
+    quicksort<T,dest>(vec, pivot + 1, end);
+}
 
-    tasks.push( make_pair(0, arr.size() - 1) );
+template <typename T, int thread_count, bool dest>
+void sort (std::vector<T> & arr)
+{
+    clock_t start = clock();
 
-    thread thrs[threads_count];
-    for (int i = 0; i < threads_count; i++)
-        thrs[i] = thread( quick_sort<T>, ref(arr), dest);
+    std::vector<T> * tst = split<T, thread_count>(arr);
+
+    std::thread thrs[thread_count];
+    for (int i = 0; i < thread_count; i++)
+    {
+        //thrs[i] = std::thread( Insertion_Sort<T>, ref(tst[i]) );
+        thrs[i] = std::thread( quicksort<T, dest>, ref(tst[i]), 0, tst[i].size()-1 );
+    }
+
 
     for (auto& th : thrs)
         th.join();
 
-    ss.clear();
+    arr = merge<T,thread_count, dest> (tst);
 
+    clock_t end = clock();
+    double sec = (double)(end - start) / CLOCKS_PER_SEC;
+    std::cout << "Execution time: " << std::fixed << std::setprecision(10) << sec << " sec\n";
 }
 
 
-class my
+int main ()
 {
-    public:
-    int x,y;
+    std::vector<int> arr;
+    fill(arr);
+    print (arr);
 
-    my(int x, int y) : x(x), y(y) {};
-    bool operator<(my & obj)
-    {
-        return (x < obj.x);
-    }
-    bool operator>(my & obj)
-    {
-        return (x > obj.x);
-    }
-    bool operator<=(my & obj)
-    {
-        return (x <= obj.x);
-    }
-    bool operator>=(my & obj)
-    {
-        return (x >= obj.x);
-    }
-    bool operator==(my & obj)
-    {
-        return (x == obj.x);
-    }
+    //std::vector<int> * tst = split<int, 4>(arr);
+    //for (int i = 0; i < 4; i++)
+    //    print (tst[i]);
+
+    sort<int, 2, false> (arr);
 
 
-    my & operator=(my & nobj)
-    {
-        x = nobj.x;
-        y = nobj.y;
-        return *this;
-    }
 
-    friend std::ostream& operator<<(std::ostream& os, const my& ob);
-
-};
-
-void swap (my & a, my & b)
-{
-    my temp(b.x, b.y);
-    b = a;
-    a = temp;
-}
-
-std::ostream& operator<<(std::ostream& os, const my& ob)
-{
-    os << "{" <<ob.x << ", " << ob.y << "}  ";
-    return os;
-}
-
-int main()
-{
-    vector<int> arr1;
-    vector<int> arr2;
-
-    int val;
-    for(int i = 0 ; i < 100; i++)
-    {
-        val = rand() % 10101;
-        arr1.push_back(val);
-        arr2.push_back(val);
-    }
-    print<int>(arr1);
-    std::cout << "_________________________________________________" << std::endl;
-    sort<int, 2, true>(arr1);
-    print<int>(arr1);
-    std::cout << "_________________________________________________" << std::endl;
-    sort<int, 2, false>(arr2);
-
-    print<int>(arr2);
-
-    vector<my> arr_my;
-
-    std::cout << "_________________________________________________" << std::endl;
-    for(int i = 0; i < 10; i++)
-    {
-        my my_obj(rand() % 101, rand() % 7);
-        arr_my.push_back(my_obj);
-    }
-    print<my>(arr_my);
-    sort<my, 2, true>(arr_my);
-    print<my>(arr_my);
+    print (arr);
 }
