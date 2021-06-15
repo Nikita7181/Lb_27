@@ -172,7 +172,6 @@ void sort (std::vector<T> & arr)
     std::thread thrs[thread_count];
     for (int i = 0; i < thread_count; i++)
     {
-        //thrs[i] = std::thread( Insertion_Sort<T>, ref(tst[i]) );
         thrs[i] = std::thread( quicksort<T, dest>, ref(tst[i]), 0, tst[i].size()-1 );
     }
 
