@@ -6,7 +6,7 @@
 #include <time.h>
 #include <iomanip>
 
-#define ARR_SIZE 20
+#define ARR_SIZE 200000
 
 template <typename T>
 void print (std::vector<T> arr)
@@ -198,9 +198,10 @@ int main ()
     //for (int i = 0; i < 4; i++)
     //    print (tst[i]);
 
-    sort<int, 2, false> (arr);
+    sort<int, 50, false> (arr);
 
 
-
-    print (arr);
+std::cout << "-----------------------sort---------------------" << std::endl;
+    //print (arr);
 }
+//Вывод: самая оптимальная для многопоточной сортировки "quick sort" для массива размерности 200 000 — 40 потоков Execution time: 0.1798940000 sec -50 Execution time: 0.2371590000 sec
